@@ -1,4 +1,4 @@
-## YOLOV5：You Only Look Once目标检测模型在pytorch当中的实现（edition v6.1 in Ultralytics）
+## YOLOV7：You Only Look Once目标检测模型在pytorch当中的实现
 ---
 
 ## 目录
@@ -13,7 +13,7 @@
 9. [参考资料 Reference](#Reference)
 
 ## Top News
-**`2022-05`**:**仓库创建，支持不同尺寸模型训练，分别为n、s、m、l、x版本的yolov5、支持step、cos学习率下降法、支持adam、sgd优化器选择、支持学习率根据batch_size自适应调整、新增图片裁剪、支持多GPU训练、支持各个种类目标数量计算、支持heatmap、支持EMA。**  
+**`2022-07`**:**仓库创建，支持step、cos学习率下降法、支持adam、sgd优化器选择、支持学习率根据batch_size自适应调整、新增图片裁剪、支持多GPU训练、支持各个种类目标数量计算、支持heatmap、支持EMA。**  
 
 ## 相关仓库
 | 模型 | 路径 |
@@ -26,15 +26,12 @@ Mobilenet-Yolov4 | https://github.com/bubbliiiing/mobilenet-yolov4-pytorch
 YoloV5-V5.0 | https://github.com/bubbliiiing/yolov5-pytorch
 YoloV5-V6.1 | https://github.com/bubbliiiing/yolov5-v6.1-pytorch
 YoloX | https://github.com/bubbliiiing/yolox-pytorch
+YoloV7 | https://github.com/bubbliiiing/yolov7-pytorch
 
 ## 性能情况
 | 训练数据集 | 权值文件名称 | 测试数据集 | 输入图片大小 | mAP 0.5:0.95 | mAP 0.5 |
 | :-----: | :-----: | :------: | :------: | :------: | :-----: |
-| COCO-Train2017 | [yolov5_n_v6.1.pth](https://github.com/bubbliiiing/yolov5-v6.1-pytorch/releases/download/v1.0/yolov5_n_v6.1.pth) | COCO-Val2017 | 640x640 | 27.6 | 45.0
-| COCO-Train2017 | [yolov5_s_v6.1.pth](https://github.com/bubbliiiing/yolov5-v6.1-pytorch/releases/download/v1.0/yolov5_s_v6.1.pth) | COCO-Val2017 | 640x640 | 37.0 | 56.2
-| COCO-Train2017 | [yolov5_m_v6.1.pth](https://github.com/bubbliiiing/yolov5-v6.1-pytorch/releases/download/v1.0/yolov5_m_v6.1.pth) | COCO-Val2017 | 640x640 | 44.7 | 63.4 
-| COCO-Train2017 | [yolov5_l_v6.1.pth](https://github.com/bubbliiiing/yolov5-v6.1-pytorch/releases/download/v1.0/yolov5_l_v6.1.pth) | COCO-Val2017 | 640x640 | 48.4 | 66.6 
-| COCO-Train2017 | [yolov5_x_v6.1.pth](https://github.com/bubbliiiing/yolov5-v6.1-pytorch/releases/download/v1.0/yolov5_x_v6.1.pth) | COCO-Val2017 | 640x640 | 50.1 | 68.3 
+| COCO-Train2017 | [yolov7_weights.pth](https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_weights.pth) | COCO-Val2017 | 640x640 | 27.6 | 45.0
 
 ## 所需环境
 torch==1.2.0    
@@ -171,7 +168,4 @@ img/street.jpg
 5. 运行get_map.py即可获得评估结果，评估结果会保存在map_out文件夹中。
 
 ## Reference
-https://github.com/qqwweee/keras-yolo3/  
-https://github.com/Cartucho/mAP  
-https://github.com/Ma-Dan/keras-yolo4  
-https://github.com/ultralytics/yolov5   
+https://github.com/WongKinYiu/yolov7

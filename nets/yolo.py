@@ -7,7 +7,7 @@ from nets.CSPdarknet import CSPDarknet, Conv, MP, RCSPDark_Block, RCSPDark_Trans
 
 class SPPCSPC(nn.Module):
     # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 13)):
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 20)):
         super(SPPCSPC, self).__init__()
         c_ = int(2 * c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -242,14 +242,13 @@ class YoloBody(nn.Module):
         #-----------------------------------------------#
 
         #---------------------------------------------------#   
-        #   生成CSPdarknet53的主干模型
+        #   生成主干模型
         #   获得三个有效特征层，他们的shape分别是：
-        #   52,52,256
-        #   26,26,512
-        #   13,13,1024
+        #   80,80,512
+        #   40,40,1024
+        #   20,20,1024
         #---------------------------------------------------#
-        # self.backbone   = CSPDarknet(model, base_channels, base_depth)
-        self.backbone   = CSPDarknet(base_channels)
+        self.backbone   = CSPDarknet(base_channels, pretrained=pretrained)
 
         self.upsample   = nn.Upsample(scale_factor=2, mode="nearest")
 
@@ -316,17 +315,17 @@ class YoloBody(nn.Module):
         P5 = self.rep_conv_3(P5)
         #---------------------------------------------------#
         #   第三个特征层
-        #   y3=(batch_size,75,52,52)
+        #   y3=(batch_size,75,80,80)
         #---------------------------------------------------#
         out2 = self.yolo_head_P3(P3)
         #---------------------------------------------------#
         #   第二个特征层
-        #   y2=(batch_size,75,26,26)
+        #   y2=(batch_size,75,40,40)
         #---------------------------------------------------#
         out1 = self.yolo_head_P4(P4)
         #---------------------------------------------------#
         #   第一个特征层
-        #   y1=(batch_size,75,13,13)
+        #   y1=(batch_size,75,20,20)
         #---------------------------------------------------#
         out0 = self.yolo_head_P5(P5)
         return out0, out1, out2
