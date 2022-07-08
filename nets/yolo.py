@@ -1,13 +1,14 @@
-from regex import X
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
-from nets.CSPdarknet import CSPDarknet, Conv, MP, RCSPDark_Block, RCSPDark_Transition, autopad, SiLU
+from nets.CSPdarknet import (Conv, CSPDarknet, RCSPDark_Block,
+                             RCSPDark_Transition, SiLU, autopad)
+
 
 class SPPCSPC(nn.Module):
     # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 20)):
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5, k=(5, 9, 13)):
         super(SPPCSPC, self).__init__()
         c_ = int(2 * c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -28,34 +29,28 @@ class SPPCSPC(nn.Module):
 class RepConv(nn.Module):
     # Represented convolution
     # https://arxiv.org/abs/2101.03697
-
     def __init__(self, c1, c2, k=3, s=1, p=None, g=1, act=SiLU(), deploy=False):
         super(RepConv, self).__init__()
-
-        self.deploy = deploy
-        self.groups = g
-        self.in_channels = c1
-        self.out_channels = c2
-
+        self.deploy         = deploy
+        self.groups         = g
+        self.in_channels    = c1
+        self.out_channels   = c2
+        
         assert k == 3
         assert autopad(k, p) == 1
 
-        padding_11 = autopad(k, p) - k // 2
-
-        self.act = nn.LeakyReLU(0.1, inplace=True) if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
+        padding_11  = autopad(k, p) - k // 2
+        self.act    = nn.LeakyReLU(0.1, inplace=True) if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
 
         if deploy:
-            self.rbr_reparam = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=True)
-
+            self.rbr_reparam    = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=True)
         else:
-            self.rbr_identity = (nn.BatchNorm2d(num_features=c1) if c2 == c1 and s == 1 else None)
-
-            self.rbr_dense = nn.Sequential(
+            self.rbr_identity   = (nn.BatchNorm2d(num_features=c1) if c2 == c1 and s == 1 else None)
+            self.rbr_dense      = nn.Sequential(
                 nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False),
                 nn.BatchNorm2d(num_features=c2),
             )
-
-            self.rbr_1x1 = nn.Sequential(
+            self.rbr_1x1        = nn.Sequential(
                 nn.Conv2d( c1, c2, 1, s, padding_11, groups=g, bias=False),
                 nn.BatchNorm2d(num_features=c2),
             )
@@ -63,12 +58,10 @@ class RepConv(nn.Module):
     def forward(self, inputs):
         if hasattr(self, "rbr_reparam"):
             return self.act(self.rbr_reparam(inputs))
-
         if self.rbr_identity is None:
             id_out = 0
         else:
             id_out = self.rbr_identity(inputs)
-
         return self.act(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out)
     
     def get_equivalent_kernel_bias(self):
@@ -124,15 +117,14 @@ class RepConv(nn.Module):
         )
 
     def fuse_conv_bn(self, conv, bn):
+        std     = (bn.running_var + bn.eps).sqrt()
+        bias    = bn.bias - bn.running_mean * bn.weight / std
 
-        std = (bn.running_var + bn.eps).sqrt()
-        bias = bn.bias - bn.running_mean * bn.weight / std
-
-        t = (bn.weight / std).reshape(-1, 1, 1, 1)
+        t       = (bn.weight / std).reshape(-1, 1, 1, 1)
         weights = conv.weight * t
 
-        bn = nn.Identity()
-        conv = nn.Conv2d(in_channels = conv.in_channels,
+        bn      = nn.Identity()
+        conv    = nn.Conv2d(in_channels = conv.in_channels,
                               out_channels = conv.out_channels,
                               kernel_size = conv.kernel_size,
                               stride=conv.stride,
@@ -143,23 +135,21 @@ class RepConv(nn.Module):
                               padding_mode = conv.padding_mode)
 
         conv.weight = torch.nn.Parameter(weights)
-        conv.bias = torch.nn.Parameter(bias)
+        conv.bias   = torch.nn.Parameter(bias)
         return conv
 
     def fuse_repvgg_block(self):    
         if self.deploy:
             return
         print(f"RepConv.fuse_repvgg_block")
-                
-        self.rbr_dense = self.fuse_conv_bn(self.rbr_dense[0], self.rbr_dense[1])
+        self.rbr_dense  = self.fuse_conv_bn(self.rbr_dense[0], self.rbr_dense[1])
         
-        self.rbr_1x1 = self.fuse_conv_bn(self.rbr_1x1[0], self.rbr_1x1[1])
-        rbr_1x1_bias = self.rbr_1x1.bias
+        self.rbr_1x1    = self.fuse_conv_bn(self.rbr_1x1[0], self.rbr_1x1[1])
+        rbr_1x1_bias    = self.rbr_1x1.bias
         weight_1x1_expanded = torch.nn.functional.pad(self.rbr_1x1.weight, [1, 1, 1, 1])
         
         # Fuse self.rbr_identity
         if (isinstance(self.rbr_identity, nn.BatchNorm2d) or isinstance(self.rbr_identity, nn.modules.batchnorm.SyncBatchNorm)):
-            # print(f"fuse: rbr_identity == BatchNorm2d or SyncBatchNorm")
             identity_conv_1x1 = nn.Conv2d(
                     in_channels=self.in_channels,
                     out_channels=self.out_channels,
@@ -170,25 +160,17 @@ class RepConv(nn.Module):
                     bias=False)
             identity_conv_1x1.weight.data = identity_conv_1x1.weight.data.to(self.rbr_1x1.weight.data.device)
             identity_conv_1x1.weight.data = identity_conv_1x1.weight.data.squeeze().squeeze()
-            # print(f" identity_conv_1x1.weight = {identity_conv_1x1.weight.shape}")
             identity_conv_1x1.weight.data.fill_(0.0)
             identity_conv_1x1.weight.data.fill_diagonal_(1.0)
             identity_conv_1x1.weight.data = identity_conv_1x1.weight.data.unsqueeze(2).unsqueeze(3)
-            # print(f" identity_conv_1x1.weight = {identity_conv_1x1.weight.shape}")
 
             identity_conv_1x1 = self.fuse_conv_bn(identity_conv_1x1, self.rbr_identity)
             bias_identity_expanded = identity_conv_1x1.bias
             weight_identity_expanded = torch.nn.functional.pad(identity_conv_1x1.weight, [1, 1, 1, 1])            
         else:
-            # print(f"fuse: rbr_identity != BatchNorm2d, rbr_identity = {self.rbr_identity}")
             bias_identity_expanded = torch.nn.Parameter( torch.zeros_like(rbr_1x1_bias) )
             weight_identity_expanded = torch.nn.Parameter( torch.zeros_like(weight_1x1_expanded) )            
         
-
-        #print(f"self.rbr_1x1.weight = {self.rbr_1x1.weight.shape}, ")
-        #print(f"weight_1x1_expanded = {weight_1x1_expanded.shape}, ")
-        #print(f"self.rbr_dense.weight = {self.rbr_dense.weight.shape}, ")
-
         self.rbr_dense.weight = torch.nn.Parameter(self.rbr_dense.weight + weight_1x1_expanded + weight_identity_expanded)
         self.rbr_dense.bias = torch.nn.Parameter(self.rbr_dense.bias + rbr_1x1_bias + bias_identity_expanded)
                 
@@ -208,7 +190,6 @@ class RepConv(nn.Module):
             self.rbr_dense = None
             
 def fuse_conv_and_bn(conv, bn):
-    # Fuse convolution and batchnorm layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/
     fusedconv = nn.Conv2d(conv.in_channels,
                           conv.out_channels,
                           kernel_size=conv.kernel_size,
@@ -217,16 +198,13 @@ def fuse_conv_and_bn(conv, bn):
                           groups=conv.groups,
                           bias=True).requires_grad_(False).to(conv.weight.device)
 
-    # prepare filters
-    w_conv = conv.weight.clone().view(conv.out_channels, -1)
-    w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))
+    w_conv  = conv.weight.clone().view(conv.out_channels, -1)
+    w_bn    = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))
     fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.shape))
 
-    # prepare spatial bias
-    b_conv = torch.zeros(conv.weight.size(0), device=conv.weight.device) if conv.bias is None else conv.bias
-    b_bn = bn.bias - bn.weight.mul(bn.running_mean).div(torch.sqrt(bn.running_var + bn.eps))
+    b_conv  = torch.zeros(conv.weight.size(0), device=conv.weight.device) if conv.bias is None else conv.bias
+    b_bn    = bn.bias - bn.weight.mul(bn.running_mean).div(torch.sqrt(bn.running_var + bn.eps))
     fusedconv.bias.copy_(torch.mm(w_bn, b_conv.reshape(-1, 1)).reshape(-1) + b_bn)
-
     return fusedconv
 
 #---------------------------------------------------#
@@ -275,16 +253,15 @@ class YoloBody(nn.Module):
         self.yolo_head_P4 = nn.Conv2d(base_channels * 16, len(anchors_mask[1]) * (5 + num_classes), 1)
         self.yolo_head_P5 = nn.Conv2d(base_channels * 32, len(anchors_mask[0]) * (5 + num_classes), 1)
 
-    def fuse(self):  # fuse model Conv2d() + BatchNorm2d() layers
+    def fuse(self):
         print('Fusing layers... ')
         for m in self.modules():
             if isinstance(m, RepConv):
-                #print(f" fuse_repvgg_block")
                 m.fuse_repvgg_block()
             elif type(m) is Conv and hasattr(m, 'bn'):
-                m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
-                delattr(m, 'bn')  # remove batchnorm
-                m.forward = m.fuseforward  # update forward
+                m.conv = fuse_conv_and_bn(m.conv, m.bn)
+                delattr(m, 'bn')
+                m.forward = m.fuseforward
         return self
     
     def forward(self, x):
@@ -315,17 +292,17 @@ class YoloBody(nn.Module):
         P5 = self.rep_conv_3(P5)
         #---------------------------------------------------#
         #   第三个特征层
-        #   y3=(batch_size,75,80,80)
+        #   y3=(batch_size, 75, 80, 80)
         #---------------------------------------------------#
         out2 = self.yolo_head_P3(P3)
         #---------------------------------------------------#
         #   第二个特征层
-        #   y2=(batch_size,75,40,40)
+        #   y2=(batch_size, 75, 40, 40)
         #---------------------------------------------------#
         out1 = self.yolo_head_P4(P4)
         #---------------------------------------------------#
         #   第一个特征层
-        #   y1=(batch_size,75,20,20)
+        #   y1=(batch_size, 75, 20, 20)
         #---------------------------------------------------#
         out0 = self.yolo_head_P5(P5)
         return out0, out1, out2
