@@ -109,11 +109,11 @@ class CSPDarknet(nn.Module):
         if pretrained:
             phi = 'l'
             url = {
-                "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/cspdarknet_backbone_l.pth',
+                "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/cspdarknet_backbone.pth',
             }[phi]
             checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", model_dir="./model_data")
             self.load_state_dict(checkpoint, strict=False)
-            print("Load weights from ", url.split('/')[-1])
+            print("Load weights from " + url.split('/')[-1])
 
     def forward(self, x):
         x = self.stem(x)

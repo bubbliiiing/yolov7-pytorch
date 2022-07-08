@@ -77,7 +77,7 @@ def download_weights(model_dir="./model_data"):
     
     phi = "l"
     download_urls = {
-        "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/cspdarknet_backbone_l.pth',
+        "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/cspdarknet_backbone.pth',
     }
     url = download_urls[phi]
     
