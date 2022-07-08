@@ -305,5 +305,5 @@ class YoloBody(nn.Module):
         #   y1=(batch_size, 75, 20, 20)
         #---------------------------------------------------#
         out0 = self.yolo_head_P5(P5)
-        return out0, out1, out2
 
+        return [out0, out1, out2]

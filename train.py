@@ -311,7 +311,7 @@ if __name__ == "__main__":
     #----------------------#
     #   获得损失函数
     #----------------------#
-    yolo_loss    = YOLOLoss(anchors, num_classes, input_shape, Cuda, anchors_mask, label_smoothing)
+    yolo_loss    = YOLOLoss(anchors, num_classes, input_shape, anchors_mask, label_smoothing)
     #----------------------#
     #   记录Loss
     #----------------------#
