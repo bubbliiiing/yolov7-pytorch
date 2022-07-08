@@ -45,14 +45,14 @@ class RepConv(nn.Module):
         if deploy:
             self.rbr_reparam    = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=True)
         else:
-            self.rbr_identity   = (nn.BatchNorm2d(num_features=c1) if c2 == c1 and s == 1 else None)
+            self.rbr_identity   = (nn.BatchNorm2d(num_features=c1, eps=0.001, momentum=0.03) if c2 == c1 and s == 1 else None)
             self.rbr_dense      = nn.Sequential(
                 nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False),
-                nn.BatchNorm2d(num_features=c2),
+                nn.BatchNorm2d(num_features=c2, eps=0.001, momentum=0.03),
             )
             self.rbr_1x1        = nn.Sequential(
                 nn.Conv2d( c1, c2, 1, s, padding_11, groups=g, bias=False),
-                nn.BatchNorm2d(num_features=c2),
+                nn.BatchNorm2d(num_features=c2, eps=0.001, momentum=0.03),
             )
 
     def forward(self, inputs):
