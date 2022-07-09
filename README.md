@@ -32,6 +32,7 @@ YoloV7 | https://github.com/bubbliiiing/yolov7-pytorch
 | 训练数据集 | 权值文件名称 | 测试数据集 | 输入图片大小 | mAP 0.5:0.95 | mAP 0.5 |
 | :-----: | :-----: | :------: | :------: | :------: | :-----: |
 | COCO-Train2017 | [yolov7_weights.pth](https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_weights.pth) | COCO-Val2017 | 640x640 | 50.7 | 69.2
+| COCO-Train2017 | [yolov7_x_weights.pth](https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_x_weights.pth) | COCO-Val2017 | 640x640 | 52.4 | 70.5
 
 ## 所需环境
 torch==1.2.0    
@@ -39,8 +40,8 @@ torch==1.2.0
 
 ## 文件下载
 训练所需的权值可在百度网盘中下载。  
-链接: https://pan.baidu.com/s/1oNl_9Bp6jjYFbGLnELbcjQ    
-提取码: 2dr9    
+链接: https://pan.baidu.com/s/1uYpjWC1uOo3Q-klpUEy9LQ     
+提取码: pmua    
 
 VOC数据集下载地址如下，里面已经包括了训练集、测试集、验证集（与测试集一样），无需再次划分：  
 链接: https://pan.baidu.com/s/19Mw2u_df_nBzsC2lg20fQA    
