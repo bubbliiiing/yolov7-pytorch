@@ -2,8 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from nets.CSPdarknet import (Conv, CSPDarknet, RCSPDark_Block,
-                             RCSPDark_Transition, SiLU, autopad)
+from nets.backbone import Backbone, Block, Conv, SiLU, Transition, autopad
 
 
 class SPPCSPC(nn.Module):
@@ -65,9 +64,9 @@ class RepConv(nn.Module):
         return self.act(self.rbr_dense(inputs) + self.rbr_1x1(inputs) + id_out)
     
     def get_equivalent_kernel_bias(self):
-        kernel3x3, bias3x3 = self._fuse_bn_tensor(self.rbr_dense)
-        kernel1x1, bias1x1 = self._fuse_bn_tensor(self.rbr_1x1)
-        kernelid, biasid = self._fuse_bn_tensor(self.rbr_identity)
+        kernel3x3, bias3x3  = self._fuse_bn_tensor(self.rbr_dense)
+        kernel1x1, bias1x1  = self._fuse_bn_tensor(self.rbr_1x1)
+        kernelid, biasid    = self._fuse_bn_tensor(self.rbr_identity)
         return (
             kernel3x3 + self._pad_1x1_to_3x3_tensor(kernel1x1) + kernelid,
             bias3x3 + bias1x1 + biasid,
@@ -83,12 +82,12 @@ class RepConv(nn.Module):
         if branch is None:
             return 0, 0
         if isinstance(branch, nn.Sequential):
-            kernel = branch[0].weight
+            kernel      = branch[0].weight
             running_mean = branch[1].running_mean
             running_var = branch[1].running_var
-            gamma = branch[1].weight
-            beta = branch[1].bias
-            eps = branch[1].eps
+            gamma       = branch[1].weight
+            beta        = branch[1].bias
+            eps         = branch[1].eps
         else:
             assert isinstance(branch, nn.BatchNorm2d)
             if not hasattr(self, "id_tensor"):
@@ -99,14 +98,14 @@ class RepConv(nn.Module):
                 for i in range(self.in_channels):
                     kernel_value[i, i % input_dim, 1, 1] = 1
                 self.id_tensor = torch.from_numpy(kernel_value).to(branch.weight.device)
-            kernel = self.id_tensor
+            kernel      = self.id_tensor
             running_mean = branch.running_mean
             running_var = branch.running_var
-            gamma = branch.weight
-            beta = branch.bias
-            eps = branch.eps
+            gamma       = branch.weight
+            beta        = branch.bias
+            eps         = branch.eps
         std = (running_var + eps).sqrt()
-        t = (gamma / std).reshape(-1, 1, 1, 1)
+        t   = (gamma / std).reshape(-1, 1, 1, 1)
         return kernel * t, beta - running_mean * gamma / std
 
     def repvgg_convert(self):
@@ -164,18 +163,18 @@ class RepConv(nn.Module):
             identity_conv_1x1.weight.data.fill_diagonal_(1.0)
             identity_conv_1x1.weight.data = identity_conv_1x1.weight.data.unsqueeze(2).unsqueeze(3)
 
-            identity_conv_1x1 = self.fuse_conv_bn(identity_conv_1x1, self.rbr_identity)
-            bias_identity_expanded = identity_conv_1x1.bias
-            weight_identity_expanded = torch.nn.functional.pad(identity_conv_1x1.weight, [1, 1, 1, 1])            
+            identity_conv_1x1           = self.fuse_conv_bn(identity_conv_1x1, self.rbr_identity)
+            bias_identity_expanded      = identity_conv_1x1.bias
+            weight_identity_expanded    = torch.nn.functional.pad(identity_conv_1x1.weight, [1, 1, 1, 1])            
         else:
-            bias_identity_expanded = torch.nn.Parameter( torch.zeros_like(rbr_1x1_bias) )
-            weight_identity_expanded = torch.nn.Parameter( torch.zeros_like(weight_1x1_expanded) )            
+            bias_identity_expanded      = torch.nn.Parameter( torch.zeros_like(rbr_1x1_bias) )
+            weight_identity_expanded    = torch.nn.Parameter( torch.zeros_like(weight_1x1_expanded) )            
         
-        self.rbr_dense.weight = torch.nn.Parameter(self.rbr_dense.weight + weight_1x1_expanded + weight_identity_expanded)
-        self.rbr_dense.bias = torch.nn.Parameter(self.rbr_dense.bias + rbr_1x1_bias + bias_identity_expanded)
+        self.rbr_dense.weight   = torch.nn.Parameter(self.rbr_dense.weight + weight_1x1_expanded + weight_identity_expanded)
+        self.rbr_dense.bias     = torch.nn.Parameter(self.rbr_dense.bias + rbr_1x1_bias + bias_identity_expanded)
                 
-        self.rbr_reparam = self.rbr_dense
-        self.deploy = True
+        self.rbr_reparam    = self.rbr_dense
+        self.deploy         = True
 
         if self.rbr_identity is not None:
             del self.rbr_identity
@@ -211,47 +210,55 @@ def fuse_conv_and_bn(conv, bn):
 #   yolo_body
 #---------------------------------------------------#
 class YoloBody(nn.Module):
-    def __init__(self, anchors_mask, num_classes, pretrained=False):
+    def __init__(self, anchors_mask, num_classes, phi, pretrained=False):
         super(YoloBody, self).__init__()
-        base_channels   = 32
+        #-----------------------------------------------#
+        #   定义了不同yolov7版本的参数
+        #-----------------------------------------------#
+        transition_channels = {'l' : 32, 'x' : 40}[phi]
+        block_channels      = 32
+        panet_channels      = {'l' : 32, 'x' : 64}[phi]
+        e       = {'l' : 2, 'x' : 1}[phi]
+        n       = {'l' : 4, 'x' : 6}[phi]
+        ids     = {'l' : [-1, -2, -3, -4, -5, -6], 'x' : [-1, -3, -5, -7, -8]}[phi]
+        conv    = {'l' : RepConv, 'x' : Conv}[phi]
         #-----------------------------------------------#
         #   输入图片是640, 640, 3
-        #   初始的基本通道是64
         #-----------------------------------------------#
 
         #---------------------------------------------------#   
         #   生成主干模型
         #   获得三个有效特征层，他们的shape分别是：
-        #   80,80,512
-        #   40,40,1024
-        #   20,20,1024
+        #   80, 80, 512
+        #   40, 40, 1024
+        #   20, 20, 1024
         #---------------------------------------------------#
-        self.backbone   = CSPDarknet(base_channels, pretrained=pretrained)
+        self.backbone   = Backbone(transition_channels, block_channels, n, phi, pretrained=pretrained)
 
         self.upsample   = nn.Upsample(scale_factor=2, mode="nearest")
 
-        self.sppcspc                = SPPCSPC(base_channels * 32, base_channels * 16)
-        self.conv_for_P5            = Conv(base_channels * 16, base_channels * 8)
-        self.conv_for_feat2         = Conv(base_channels * 32, base_channels * 8)
-        self.conv3_for_upsample1    = RCSPDark_Block(base_channels * 16, base_channels * 4, base_channels * 8, ids=[-1, -2, -3, -4, -5, -6])
+        self.sppcspc                = SPPCSPC(transition_channels * 32, transition_channels * 16)
+        self.conv_for_P5            = Conv(transition_channels * 16, transition_channels * 8)
+        self.conv_for_feat2         = Conv(transition_channels * 32, transition_channels * 8)
+        self.conv3_for_upsample1    = Block(transition_channels * 16, panet_channels * 4, transition_channels * 8, e=e, n=n, ids=ids)
 
-        self.conv_for_P4            = Conv(base_channels * 8, base_channels * 4)
-        self.conv_for_feat1         = Conv(base_channels * 16, base_channels * 4)
-        self.conv3_for_upsample2    = RCSPDark_Block(base_channels * 8, base_channels * 2, base_channels * 4, ids=[-1, -2, -3, -4, -5, -6])
+        self.conv_for_P4            = Conv(transition_channels * 8, transition_channels * 4)
+        self.conv_for_feat1         = Conv(transition_channels * 16, transition_channels * 4)
+        self.conv3_for_upsample2    = Block(transition_channels * 8, panet_channels * 2, transition_channels * 4, e=e, n=n, ids=ids)
 
-        self.down_sample1           = RCSPDark_Transition(base_channels * 4, base_channels * 4)
-        self.conv3_for_downsample1  = RCSPDark_Block(base_channels * 16, base_channels * 4, base_channels * 8, ids=[-1, -2, -3, -4, -5, -6])
+        self.down_sample1           = Transition(transition_channels * 4, transition_channels * 4)
+        self.conv3_for_downsample1  = Block(transition_channels * 16, panet_channels * 4, transition_channels * 8, e=e, n=n, ids=ids)
 
-        self.down_sample2           = RCSPDark_Transition(base_channels * 8, base_channels * 8)
-        self.conv3_for_downsample2  = RCSPDark_Block(base_channels * 32, base_channels * 8, base_channels * 16, ids=[-1, -2, -3, -4, -5, -6])
+        self.down_sample2           = Transition(transition_channels * 8, transition_channels * 8)
+        self.conv3_for_downsample2  = Block(transition_channels * 32, panet_channels * 8, transition_channels * 16, e=e, n=n, ids=ids)
 
-        self.rep_conv_1 = RepConv(base_channels * 4, base_channels * 8, 3, 1)
-        self.rep_conv_2 = RepConv(base_channels * 8, base_channels * 16, 3, 1)
-        self.rep_conv_3 = RepConv(base_channels * 16, base_channels * 32, 3, 1)
+        self.rep_conv_1 = conv(transition_channels * 4, transition_channels * 8, 3, 1)
+        self.rep_conv_2 = conv(transition_channels * 8, transition_channels * 16, 3, 1)
+        self.rep_conv_3 = conv(transition_channels * 16, transition_channels * 32, 3, 1)
 
-        self.yolo_head_P3 = nn.Conv2d(base_channels * 8, len(anchors_mask[2]) * (5 + num_classes), 1)
-        self.yolo_head_P4 = nn.Conv2d(base_channels * 16, len(anchors_mask[1]) * (5 + num_classes), 1)
-        self.yolo_head_P5 = nn.Conv2d(base_channels * 32, len(anchors_mask[0]) * (5 + num_classes), 1)
+        self.yolo_head_P3 = nn.Conv2d(transition_channels * 8, len(anchors_mask[2]) * (5 + num_classes), 1)
+        self.yolo_head_P4 = nn.Conv2d(transition_channels * 16, len(anchors_mask[1]) * (5 + num_classes), 1)
+        self.yolo_head_P5 = nn.Conv2d(transition_channels * 32, len(anchors_mask[0]) * (5 + num_classes), 1)
 
     def fuse(self):
         print('Fusing layers... ')

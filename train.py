@@ -98,6 +98,12 @@ if __name__ == "__main__":
     #   input_shape     输入的shape大小，一定要是32的倍数
     #------------------------------------------------------#
     input_shape     = [640, 640]
+    #------------------------------------------------------#
+    #   phi             所使用到的yolov7的版本，本仓库一共提供两个：
+    #                   l : 对应yolov7
+    #                   x : 对应yolov7_x
+    #------------------------------------------------------#
+    phi             = 'l'
     #----------------------------------------------------------------------------------------------------------------------------#
     #   pretrained      是否使用主干网络的预训练权重，此处使用的是主干的权重，因此是在模型构建的时候进行加载的。
     #                   如果设置了model_path，则主干的权值无需加载，pretrained的值无意义。
@@ -268,15 +274,15 @@ if __name__ == "__main__":
     if pretrained:
         if distributed:
             if local_rank == 0:
-                download_weights()  
+                download_weights(phi)  
             dist.barrier()
         else:
-            download_weights()
+            download_weights(phi)
             
     #------------------------------------------------------#
     #   创建yolo模型
     #------------------------------------------------------#
-    model = YoloBody(anchors_mask, num_classes, pretrained=pretrained)
+    model = YoloBody(anchors_mask, num_classes, phi, pretrained=pretrained)
     if not pretrained:
         weights_init(model)
     if model_path != '':

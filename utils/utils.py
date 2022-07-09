@@ -71,13 +71,13 @@ def show_config(**kwargs):
         print('|%25s | %40s|' % (str(key), str(value)))
     print('-' * 70)
         
-def download_weights(model_dir="./model_data"):
+def download_weights(phi, model_dir="./model_data"):
     import os
     from torch.hub import load_state_dict_from_url
     
-    phi = "l"
     download_urls = {
-        "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/cspdarknet_backbone.pth',
+        "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_backbone.pth',
+        "x" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_x_backbone.pth',
     }
     url = download_urls[phi]
     

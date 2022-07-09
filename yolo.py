@@ -37,6 +37,12 @@ class YOLO(object):
         #   输入图片的大小，必须为32的倍数。
         #---------------------------------------------------------------------#
         "input_shape"       : [640, 640],
+        #------------------------------------------------------#
+        #   所使用到的yolov7的版本，本仓库一共提供两个：
+        #   l : 对应yolov7
+        #   x : 对应yolov7_x
+        #------------------------------------------------------#
+        "phi"               : 'l',
         #---------------------------------------------------------------------#
         #   只有得分大于置信度的预测框会被保留下来
         #---------------------------------------------------------------------#
@@ -97,7 +103,7 @@ class YOLO(object):
         #---------------------------------------------------#
         #   建立yolo模型，载入yolo模型的权重
         #---------------------------------------------------#
-        self.net    = YoloBody(self.anchors_mask, self.num_classes)
+        self.net    = YoloBody(self.anchors_mask, self.num_classes, self.phi)
         device      = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.net.load_state_dict(torch.load(self.model_path, map_location=device))
         self.net    = self.net.fuse().eval()

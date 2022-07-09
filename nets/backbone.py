@@ -25,10 +25,10 @@ class Conv(nn.Module):
     def fuseforward(self, x):
         return self.act(self.conv(x))
     
-class RCSPDark_Block(nn.Module):
-    def __init__(self, c1, c2, c3, n=4, e=0.5, ids=[0]):
-        super(RCSPDark_Block, self).__init__()
-        c_ = int(c1 * e)
+class Block(nn.Module):
+    def __init__(self, c1, c2, c3, n=4, e=1, ids=[0]):
+        super(Block, self).__init__()
+        c_ = int(c2 * e)
         
         self.ids = ids
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -58,9 +58,9 @@ class MP(nn.Module):
     def forward(self, x):
         return self.m(x)
     
-class RCSPDark_Transition(nn.Module):
+class Transition(nn.Module):
     def __init__(self, c1, c2):
-        super(RCSPDark_Transition, self).__init__()
+        super(Transition, self).__init__()
         self.cv1 = Conv(c1, c2, 1, 1)
         self.cv2 = Conv(c1, c2, 1, 1)
         self.cv3 = Conv(c2, c2, 3, 2)
@@ -76,40 +76,42 @@ class RCSPDark_Transition(nn.Module):
         
         return torch.cat([x_2, x_1], 1)
     
-class CSPDarknet(nn.Module):
-    def __init__(self, base_channels, pretrained=False):
+class Backbone(nn.Module):
+    def __init__(self, transition_channels, block_channels, n, phi, pretrained=False):
         super().__init__()
         #-----------------------------------------------#
         #   输入图片是640, 640, 3
-        #   初始的基本通道是64
         #-----------------------------------------------#
-        
+        ids = {
+            'l' : [-1, -3, -5, -6],
+            'x' : [-1, -3, -5, -7, -8], 
+        }[phi]
         self.stem = nn.Sequential(
-            Conv(3, base_channels, 3, 1),
-            Conv(base_channels, base_channels * 2, 3, 2),
-            Conv(base_channels * 2, base_channels * 2, 3, 1),
+            Conv(3, transition_channels, 3, 1),
+            Conv(transition_channels, transition_channels * 2, 3, 2),
+            Conv(transition_channels * 2, transition_channels * 2, 3, 1),
         )
         self.dark2 = nn.Sequential(
-            Conv(base_channels * 2, base_channels * 4, 3, 2),
-            RCSPDark_Block(base_channels * 4, base_channels * 2, base_channels * 8, ids=[-1, -3, -5, -6]),
+            Conv(transition_channels * 2, transition_channels * 4, 3, 2),
+            Block(transition_channels * 4, block_channels * 2, transition_channels * 8, n=n, ids=ids),
         )
         self.dark3 = nn.Sequential(
-            RCSPDark_Transition(base_channels * 8, base_channels * 4),
-            RCSPDark_Block(base_channels * 8, base_channels * 4, base_channels * 16, ids=[-1, -3, -5, -6]),
+            Transition(transition_channels * 8, transition_channels * 4),
+            Block(transition_channels * 8, block_channels * 4, transition_channels * 16, n=n, ids=ids),
         )
         self.dark4 = nn.Sequential(
-            RCSPDark_Transition(base_channels * 16, base_channels * 8),
-            RCSPDark_Block(base_channels * 16, base_channels * 8, base_channels * 32, ids=[-1, -3, -5, -6]),
+            Transition(transition_channels * 16, transition_channels * 8),
+            Block(transition_channels * 16, block_channels * 8, transition_channels * 32, n=n, ids=ids),
         )
         self.dark5 = nn.Sequential(
-            RCSPDark_Transition(base_channels * 32, base_channels * 16),
-            RCSPDark_Block(base_channels * 32, base_channels * 8, base_channels * 32, e=1/4, ids=[-1, -3, -5, -6]),
+            Transition(transition_channels * 32, transition_channels * 16),
+            Block(transition_channels * 32, block_channels * 8, transition_channels * 32, n=n, ids=ids),
         )
         
         if pretrained:
-            phi = 'l'
             url = {
-                "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/cspdarknet_backbone.pth',
+                "l" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_backbone.pth',
+                "x" : 'https://github.com/bubbliiiing/yolov7-pytorch/releases/download/v1.0/yolov7_x_backbone.pth',
             }[phi]
             checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", model_dir="./model_data")
             self.load_state_dict(checkpoint, strict=False)

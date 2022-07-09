@@ -57,7 +57,10 @@ class YoloDataset(Dataset):
         image       = np.transpose(preprocess_input(np.array(image, dtype=np.float32)), (2, 0, 1))
         box         = np.array(box, dtype=np.float32)
         
-        nL          = len(box)  # number of labels
+        #---------------------------------------------------#
+        #   对真实框进行预处理
+        #---------------------------------------------------#
+        nL          = len(box)
         labels_out  = np.zeros((nL, 6))
         if nL:
             #---------------------------------------------------#
@@ -73,6 +76,10 @@ class YoloDataset(Dataset):
             box[:, 2:4] = box[:, 2:4] - box[:, 0:2]
             box[:, 0:2] = box[:, 0:2] + box[:, 2:4] / 2
             
+            #---------------------------------------------------#
+            #   调整顺序，符合训练的格式
+            #   labels_out中序号为0的部分在collect时处理
+            #---------------------------------------------------#
             labels_out[:, 1] = box[:, -1]
             labels_out[:, 2:] = box[:, :4]
             
