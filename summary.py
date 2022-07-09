@@ -3,7 +3,6 @@
 #--------------------------------------------#
 import torch
 from thop import clever_format, profile
-from torchsummary import summary
 
 from nets.yolo import YoloBody
 
@@ -15,7 +14,9 @@ if __name__ == "__main__":
     
     device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     m       = YoloBody(anchors_mask, num_classes, phi, False).to(device)
-    summary(m, (3, input_shape[0], input_shape[1]))
+    for i in m.children():
+        print(i)
+        print('==============================')
     
     dummy_input     = torch.randn(1, 3, input_shape[0], input_shape[1]).to(device)
     flops, params   = profile(m.to(device), (dummy_input, ), verbose=False)
