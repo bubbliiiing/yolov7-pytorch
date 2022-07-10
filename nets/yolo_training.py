@@ -177,7 +177,7 @@ class YOLOLoss(nn.Module):
         bs          = tobj.shape[0]
         
         loss    = box_loss + obj_loss + cls_loss
-        return loss * bs
+        return loss
         
     def xywh2xyxy(self, x):
         # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2]
