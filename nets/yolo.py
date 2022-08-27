@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from nets.backbone import Backbone, Block, Conv, SiLU, Transition, autopad
+from nets.backbone import Backbone, Multi_Concat_Block, Conv, SiLU, Transition_Block, autopad
 
 
 class SPPCSPC(nn.Module):
@@ -240,17 +240,17 @@ class YoloBody(nn.Module):
         self.sppcspc                = SPPCSPC(transition_channels * 32, transition_channels * 16)
         self.conv_for_P5            = Conv(transition_channels * 16, transition_channels * 8)
         self.conv_for_feat2         = Conv(transition_channels * 32, transition_channels * 8)
-        self.conv3_for_upsample1    = Block(transition_channels * 16, panet_channels * 4, transition_channels * 8, e=e, n=n, ids=ids)
+        self.conv3_for_upsample1    = Multi_Concat_Block(transition_channels * 16, panet_channels * 4, transition_channels * 8, e=e, n=n, ids=ids)
 
         self.conv_for_P4            = Conv(transition_channels * 8, transition_channels * 4)
         self.conv_for_feat1         = Conv(transition_channels * 16, transition_channels * 4)
-        self.conv3_for_upsample2    = Block(transition_channels * 8, panet_channels * 2, transition_channels * 4, e=e, n=n, ids=ids)
+        self.conv3_for_upsample2    = Multi_Concat_Block(transition_channels * 8, panet_channels * 2, transition_channels * 4, e=e, n=n, ids=ids)
 
-        self.down_sample1           = Transition(transition_channels * 4, transition_channels * 4)
-        self.conv3_for_downsample1  = Block(transition_channels * 16, panet_channels * 4, transition_channels * 8, e=e, n=n, ids=ids)
+        self.down_sample1           = Transition_Block(transition_channels * 4, transition_channels * 4)
+        self.conv3_for_downsample1  = Multi_Concat_Block(transition_channels * 16, panet_channels * 4, transition_channels * 8, e=e, n=n, ids=ids)
 
-        self.down_sample2           = Transition(transition_channels * 8, transition_channels * 8)
-        self.conv3_for_downsample2  = Block(transition_channels * 32, panet_channels * 8, transition_channels * 16, e=e, n=n, ids=ids)
+        self.down_sample2           = Transition_Block(transition_channels * 8, transition_channels * 8)
+        self.conv3_for_downsample2  = Multi_Concat_Block(transition_channels * 32, panet_channels * 8, transition_channels * 16, e=e, n=n, ids=ids)
 
         self.rep_conv_1 = conv(transition_channels * 4, transition_channels * 8, 3, 1)
         self.rep_conv_2 = conv(transition_channels * 8, transition_channels * 16, 3, 1)

@@ -25,9 +25,9 @@ class Conv(nn.Module):
     def fuseforward(self, x):
         return self.act(self.conv(x))
     
-class Block(nn.Module):
+class Multi_Concat_Block(nn.Module):
     def __init__(self, c1, c2, c3, n=4, e=1, ids=[0]):
-        super(Block, self).__init__()
+        super(Multi_Concat_Block, self).__init__()
         c_ = int(c2 * e)
         
         self.ids = ids
@@ -58,9 +58,9 @@ class MP(nn.Module):
     def forward(self, x):
         return self.m(x)
     
-class Transition(nn.Module):
+class Transition_Block(nn.Module):
     def __init__(self, c1, c2):
-        super(Transition, self).__init__()
+        super(Transition_Block, self).__init__()
         self.cv1 = Conv(c1, c2, 1, 1)
         self.cv2 = Conv(c1, c2, 1, 1)
         self.cv3 = Conv(c2, c2, 3, 2)
@@ -93,19 +93,19 @@ class Backbone(nn.Module):
         )
         self.dark2 = nn.Sequential(
             Conv(transition_channels * 2, transition_channels * 4, 3, 2),
-            Block(transition_channels * 4, block_channels * 2, transition_channels * 8, n=n, ids=ids),
+            Multi_Concat_Block(transition_channels * 4, block_channels * 2, transition_channels * 8, n=n, ids=ids),
         )
         self.dark3 = nn.Sequential(
-            Transition(transition_channels * 8, transition_channels * 4),
-            Block(transition_channels * 8, block_channels * 4, transition_channels * 16, n=n, ids=ids),
+            Transition_Block(transition_channels * 8, transition_channels * 4),
+            Multi_Concat_Block(transition_channels * 8, block_channels * 4, transition_channels * 16, n=n, ids=ids),
         )
         self.dark4 = nn.Sequential(
-            Transition(transition_channels * 16, transition_channels * 8),
-            Block(transition_channels * 16, block_channels * 8, transition_channels * 32, n=n, ids=ids),
+            Transition_Block(transition_channels * 16, transition_channels * 8),
+            Multi_Concat_Block(transition_channels * 16, block_channels * 8, transition_channels * 32, n=n, ids=ids),
         )
         self.dark5 = nn.Sequential(
-            Transition(transition_channels * 32, transition_channels * 16),
-            Block(transition_channels * 32, block_channels * 8, transition_channels * 32, n=n, ids=ids),
+            Transition_Block(transition_channels * 32, transition_channels * 16),
+            Multi_Concat_Block(transition_channels * 32, block_channels * 8, transition_channels * 32, n=n, ids=ids),
         )
         
         if pretrained:
