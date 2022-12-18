@@ -384,7 +384,7 @@ class YOLOLoss(nn.Module):
             #-------------------------------------------#
             #   取出符合条件的框
             #-------------------------------------------#
-            from_which_layer    = from_which_layer[fg_mask_inboxes]
+            from_which_layer    = from_which_layer.to(fg_mask_inboxes.device)[fg_mask_inboxes]
             all_b               = all_b[fg_mask_inboxes]
             all_a               = all_a[fg_mask_inboxes]
             all_gj              = all_gj[fg_mask_inboxes]
