@@ -133,6 +133,7 @@ class YOLO(object):
         image_data  = resize_image(image, (self.input_shape[1], self.input_shape[0]), self.letterbox_image)
         #---------------------------------------------------------#
         #   添加上batch_size维度
+        #   h, w, 3 => 3, h, w => 1, 3, h, w
         #---------------------------------------------------------#
         image_data  = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
 
