@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from PIL import Image
 
 
@@ -16,19 +17,51 @@ def cvtColor(image):
 #---------------------------------------------------#
 #   对输入图像进行resize
 #---------------------------------------------------#
-def resize_image(image, size, letterbox_image):
-    iw, ih  = image.size
-    w, h    = size
-    if letterbox_image:
-        scale   = min(w/iw, h/ih)
-        nw      = int(iw*scale)
-        nh      = int(ih*scale)
+def resize_image(image, size, letterbox_image, mode='PIL'):
+    if mode == 'PIL':
+        iw, ih  = image.size
+        w, h    = size
 
-        image   = image.resize((nw,nh), Image.BICUBIC)
-        new_image = Image.new('RGB', size, (128,128,128))
-        new_image.paste(image, ((w-nw)//2, (h-nh)//2))
+        if letterbox_image:
+            scale   = min(w/iw, h/ih)
+            nw      = int(iw*scale)
+            nh      = int(ih*scale)
+
+            image   = image.resize((nw,nh), Image.BICUBIC)
+            new_image = Image.new('RGB', size, (128,128,128))
+            new_image.paste(image, ((w-nw)//2, (h-nh)//2))
+        else:
+            new_image = image.resize((w, h), Image.BICUBIC)
     else:
-        new_image = image.resize((w, h), Image.BICUBIC)
+        image = np.array(image)
+        if letterbox_image:
+            # 获得现在的shape
+            shape       = np.shape(image)[:2]
+            # 获得输出的shape
+            if isinstance(size, int):
+                size    = (size, size)
+
+            # 计算缩放的比例
+            r = min(size[0] / shape[0], size[1] / shape[1])
+
+            # 计算缩放后图片的高宽
+            new_unpad   = int(round(shape[1] * r)), int(round(shape[0] * r))
+            dw, dh      = size[1] - new_unpad[0], size[0] - new_unpad[1]
+
+            # 除以2以padding到两边
+            dw          /= 2  
+            dh          /= 2
+    
+            # 对图像进行resize
+            if shape[::-1] != new_unpad:  # resize
+                image = cv2.resize(image, new_unpad, interpolation=cv2.INTER_LINEAR)
+            top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+            left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    
+            new_image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(128, 128, 128))  # add border
+        else:
+            new_image = cv2.resize(image, (w, h))
+
     return new_image
 
 #---------------------------------------------------#
